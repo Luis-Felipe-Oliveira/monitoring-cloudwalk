@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudWalk Monitoring - Observability Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 25px 35px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin-bottom: 25px;
+            border: 1px solid #334155;
+        }
+
+        h1 {
+            color: #60a5fa;
+            font-size: 32px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .status-online {
+            background: #10b981;
+            box-shadow: 0 0 15px #10b981;
+        }
+
+        .status-offline {
+            background: #ef4444;
+            box-shadow: 0 0 15px #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(0.95); }
+        }
+
+        /* SEÇÃO 1: KPIs PRINCIPAIS */
+        .kpi-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            color: #60a5fa;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: #60a5fa;
+            border-radius: 2px;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #60a5fa, #3b82f6);
+        }
+
+        .kpi-card.severity-critical::before {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+        }
+
+        .kpi-card.severity-warning::before {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+
+        .kpi-card.severity-normal::before {
+            background: linear-gradient(90deg, #10b981, #059669);
+        }
+
+        .kpi-header {
+            color: #94a3b8;
+            font-size: 13px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .kpi-label {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 10px;
+        }
+
+        .badge-none {
+            background: rgba(100, 116, 139, 0.2);
+            color: #94a3b8;
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* GRÁFICOS */
+        .chart-section {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
+            margin-bottom: 25px;
+        }
+
+        .chart-title {
+            color: #60a5fa;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chart-subtitle {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 400;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+        }
+
+        /* TABELA DE ALERTAS */
+        .alerts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .alerts-table th {
+            background: rgba(30, 41, 59, 0.5);
+            color: #94a3b8;
+            text-align: left;
+            padding: 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+            border-bottom: 2px solid #334155;
+        }
+
+        .alerts-table td {
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+            color: #e2e8f0;
+            font-size: 13px;
+        }
+
+        .alerts-table tr:hover {
+            background: rgba(30, 41, 59, 0.3);
+        }
+
+        .timestamp-cell {
+            font-family: 'Courier New', monospace;
+            color: #64748b;
+            font-size: 11px;
+        }
+
+        .value-cell {
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .severity-cell {
+            font-weight: 700;
+        }
+
+        .severity-critical-text { color: #f87171; }
+        .severity-warning-text { color: #fbbf24; }
+        .severity-normal-text { color: #34d399; }
+
+        /* BOTÕES */
+        .refresh-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .refresh-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .auto-refresh {
+            display: inline-flex;
+            align-items: center;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        .auto-refresh input {
+            margin-right: 6px;
+            cursor: pointer;
+        }
+
+        footer {
+            text-align: center;
+            color: #64748b;
+            margin-top: 30px;
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ef4444;
+        }
+
+        /* GRID 2 COLUNAS */
+        .two-col-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        @media (max-width: 1200px) {
+            .two-col-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="status-indicator" id="statusIndicator"></span>
+                CloudWalk Monitoring Dashboard
+            </h1>
+            <div class="subtitle">
+                <span>Real-time Transaction Monitoring & Observability Platform</span>
+                <button class="refresh-btn" onclick="fetchData()">🔄 Atualizar</button>
+                <label class="auto-refresh">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    Auto-refresh (5s)
+                </label>
+            </div>
+        </header>
+
+        <div id="errorContainer"></div>
+
+        <!-- SEÇÃO 1: VISÃO GERAL (Overview) - KPIs -->
+        <div class="kpi-section">
+            <div class="section-title">
+                📊 Visão Geral - Estado do Sistema
+            </div>
+            <div class="kpi-grid">
+                <div class="kpi-card" id="kpiTotal">
+                    <div class="kpi-header">📈 Total de Transações</div>
+                    <div class="kpi-value">-</div>
+                    <div class="kpi-label">Últimos dados no buffer</div>
+                </div>
+
+                <div class="kpi-card" id="kpiErrorRate">
+                    <div class="kpi-header">⚠️ Taxa de Erro</div>
+                    <div class="kpi-value">-%</div>
+                    <div class="kpi-label">Failed + Denied + Reversed</div>
+                </div>
+
+                <div class="kpi-card" id="kpiActiveAlerts">
+                    <div class="kpi-header">🔔 Alertas Ativos</div>
+                    <div class="kpi-value">-</div>
+                    <div class="kpi-label">Críticos + Warnings</div>
+                </div>
+
+                <div class="kpi-card" id="kpiSeverity">
+                    <div class="kpi-header">🚨 Severidade Atual</div>
+                    <div class="kpi-value" style="font-size: 32px;">-</div>
+                    <div class="severity-badge badge-none" id="severityBadge">NONE</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 2: SÉRIE TEMPORAL (Obrigatório) -->
+        <div class="chart-section">
+            <div class="chart-title">
+                📈 Série Temporal - Transações por Status
+                <span class="chart-subtitle">Tendência ao longo do tempo (últimas 20 medições)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="timeSeriesChart"></canvas>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 3: BASELINE vs ATUAL (Muito forte) -->
+        <div class="two-col-grid">
+            <div class="chart-section">
+                <div class="chart-title">
+                    🎯 Baseline vs Atual - Observabilidade Real
+                    <span class="chart-subtitle">Linha sólida: atual | Linha pontilhada: média histórica | Zona sombreada: P95</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="baselineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 5: STATUS DISTRIBUTION -->
+            <div class="chart-section">
+                <div class="chart-title">
+                    📊 Distribuição de Status
+                    <span class="chart-subtitle">Percentual por tipo</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="distributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 4: ALERTAS RECENTES (Tabela) -->
+        <div class="chart-section">
+            <div class="chart-title">
+                📋 Alertas Recentes - Rastreabilidade e Auditabilidade
+                <span class="chart-subtitle">Últimos 10 alertas detectados</span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="alerts-table" id="alertsTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Métrica</th>
+                            <th>Valor Observado</th>
+                            <th>Threshold</th>
+                            <th>Severidade</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alertsTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #64748b;">Carregando alertas...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <p>CloudWalk Monitoring System © 2024 | 
+            Última atualização: <span id="lastUpdate">-</span> | 
+            Uptime: <span id="uptime">calculating...</span></p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000';
+        let timeSeriesChart = null;
+        let baselineChart = null;
+        let distributionChart = null;
+        let autoRefreshInterval = null;
+        let startTime = Date.now();
+        
+        // Históricos para séries temporais
+        let timeSeriesData = {
+            labels: [],
+            approved: [],
+            failed: [],
+            denied: [],
+            reversed: []
+        };
+
+        // Inicializar gráficos
+        function initCharts() {
+            // Gráfico de Série Temporal
+            const timeSeriesCtx = document.getElementById('timeSeriesChart').getContext('2d');
+            timeSeriesChart = new Chart(timeSeriesCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'APPROVED',
+                            data: [],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'FAILED',
+                            data: [],
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'DENIED',
+                            data: [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'REVERSED',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e2e8f0', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            titleColor: '#60a5fa',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#334155',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            });
+
+            // Gráfico Baseline vs Atual
+            const baselineCtx = document.getElementById('baselineChart').getContext('2d');
+            baselineChart = new Chart(baselineCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Valor Atual (FAILED)',
+                            data: [],
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Média Histórica (Baseline)',
+                            data: [],
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0,
+                            fill: false,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Limite P95 (Normal)',
+                            data: [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            tension: 0,
+                            fill: '+1',
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e2e8f0' }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            titleColor: '#60a5fa',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#334155',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de Distribuição (Pizza)
+            const distributionCtx = document.getElementById('distributionChart').getContext('2d');
+            distributionChart = new Chart(distributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#10b981',
+                            '#ef4444',
+                            '#f59e0b',
+                            '#3b82f6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { 
+                                color: '#e2e8f0', 
+                                padding: 15,
+                                font: { size: 13 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            titleColor: '#60a5fa',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Buscar dados da API
+        async function fetchData() {
+            try {
+                document.getElementById('errorContainer').innerHTML = '';
+                
+                const [dashboardResponse, statsResponse] = await Promise.all([
+                    fetch(`${API_URL}/dashboard`),
+                    fetch(`${API_URL}/stats`)
+                ]);
+                
+                if (!dashboardResponse.ok || !statsResponse.ok) {
+                    throw new Error(`HTTP ${dashboardResponse.status}`);
+                }
+                
+                const dashboardData = await dashboardResponse.json();
+                const statsData = await statsResponse.json();
+
+                updateKPIs(dashboardData);
+                updateTimeSeries(dashboardData);
+                updateBaseline(dashboardData, statsData);
+                updateDistribution(dashboardData);
+                updateAlertsTable(dashboardData.recent_alerts);
+                updateStatus(true);
+
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+                updateUptime();
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+                updateStatus(false);
+                showError('Erro ao conectar com a API em ' + API_URL);
+            }
+        }
+
+        // Atualizar KPIs
+        function updateKPIs(data) {
+            const total = data.current_status.total_transactions;
+            const errorRate = data.current_status.error_rate_percent;
+            const activeAlerts = data.alerts_count.critical + data.alerts_count.warning;
+            
+            // Determinar maior severidade
+            let maxSeverity = 'NONE';
+            if (data.alerts_count.critical > 0) {
+                maxSeverity = 'CRITICAL';
+            } else if (data.alerts_count.warning > 0) {
+                maxSeverity = 'WARNING';
+            } else if (errorRate < 5) {
+                maxSeverity = 'NORMAL';
+            }
+
+            document.querySelector('#kpiTotal .kpi-value').textContent = total;
+            document.querySelector('#kpiErrorRate .kpi-value').textContent = errorRate.toFixed(2) + '%';
+            document.querySelector('#kpiActiveAlerts .kpi-value').textContent = activeAlerts;
+            document.querySelector('#kpiSeverity .kpi-value').textContent = maxSeverity;
+
+            // Atualizar cores dos cards
+            const kpiErrorRate = document.getElementById('kpiErrorRate');
+            const kpiSeverity = document.getElementById('kpiSeverity');
+            const severityBadge = document.getElementById('severityBadge');
+
+            if (errorRate > 15) {
+                kpiErrorRate.className = 'kpi-card severity-critical';
+            } else if (errorRate > 5) {
+                kpiErrorRate.className = 'kpi-card severity-warning';
+            } else {
+                kpiErrorRate.className = 'kpi-card severity-normal';
+            }
+
+            kpiSeverity.className = `kpi-card severity-${maxSeverity.toLowerCase()}`;
+            severityBadge.className = `severity-badge badge-${maxSeverity.toLowerCase()}`;
+            severityBadge.textContent = maxSeverity;
+        }
+
+        // Atualizar Série Temporal
+        function updateTimeSeries(data) {
+            const statusDist = data.current_status.status_distribution;
+            const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            timeSeriesData.labels.push(timestamp);
+            timeSeriesData.approved.push(statusDist.APPROVED || 0);
+            timeSeriesData.failed.push(statusDist.FAILED || 0);
+            timeSeriesData.denied.push(statusDist.DENIED || 0);
+            timeSeriesData.reversed.push(statusDist.REVERSED || 0);
+
+            // Manter apenas últimas 20 medições
+            if (timeSeriesData.labels.length > 20) {
+                timeSeriesData.labels.shift();
+                timeSeriesData.approved.shift();
+                timeSeriesData.failed.shift();
+                timeSeriesData.denied.shift();
+                timeSeriesData.reversed.shift();
+            }
+
+            timeSeriesChart.data.labels = timeSeriesData.labels;
+            timeSeriesChart.data.datasets[0].data = timeSeriesData.approved;
+            timeSeriesChart.data.datasets[1].data = timeSeriesData.failed;
+            timeSeriesChart.data.datasets[2].data = timeSeriesData.denied;
+            timeSeriesChart.data.datasets[3].data = timeSeriesData.reversed;
+            timeSeriesChart.update('none');
+        }
+
+        // Atualizar Baseline vs Atual
+        function updateBaseline(dashboardData, statsData) {
+            const statusDist = dashboardData.current_status.status_distribution;
+            const failedCurrent = statusDist.FAILED || 0;
+            
+            // Buscar baseline do statsData
+            const baseline = statsData.detector_stats?.baseline?.FAILED;
+            const mean = baseline?.mean || 5;
+            const p95 = baseline?.p95 || 10;
+
+            const labels = baselineChart.data.labels;
+            const currentData = baselineChart.data.datasets[0].data;
+            const meanData = baselineChart.data.datasets[1].data;
+            const p95Data = baselineChart.data.datasets[2].data;
+
+            labels.push(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+            currentData.push(failedCurrent);
+            meanData.push(mean);
+            p95Data.push(p95);
+
+            // Manter últimas 15 medições
+            if (labels.length > 15) {
+                labels.shift();
+                currentData.shift();
+                meanData.shift();
+                p95Data.shift();
+            }
+
+            baselineChart.update('none');
+        }
+
+        // Atualizar Distribuição
+        function updateDistribution(data) {
+            const statusDist = data.current_status.status_distribution;
+            
+            distributionChart.data.labels = Object.keys(statusDist);
+            distributionChart.data.datasets[0].data = Object.values(statusDist);
+            distributionChart.update('none');
+        }
+
+        // Atualizar Tabela de Alertas
+        function updateAlertsTable(alerts) {
+            const tbody = document.getElementById('alertsTableBody');
+            
+            if (!alerts || alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #10b981;">✓ Nenhum alerta no momento - Sistema operando normalmente</td></tr>';
+                return;
+            }
+
+            const rows = alerts.slice().reverse().slice(0, 10).map(alert => {
+                const time = new Date(alert.timestamp).toLocaleString('pt-BR');
+                const details = alert.details && alert.details.length > 0 ? alert.details[0] : {};
+                const metric = details.status || 'N/A';
+                const value = details.count || 'N/A';
+                const threshold = details.threshold ? details.threshold.toFixed(1) : 'N/A';
+                const severity = alert.severity;
+                const severityClass = `severity-${severity.toLowerCase()}-text`;
+
+                return `
+                    <tr>
+                        <td class="timestamp-cell">${time}</td>
+                        <td><strong>${metric}</strong></td>
+                        <td class="value-cell">${value}</td>
+                        <td class="value-cell">${threshold}</td>
+                        <td class="severity-cell ${severityClass}">${severity}</td>
+                        <td style="font-size: 11px; color: #64748b;">${JSON.stringify(alert.status_counts)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = rows;
+        }
+
+        // Atualizar uptime
+        function updateUptime() {
+            const uptime = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = uptime % 60;
+            
+            if (hours > 0) {
+                document.getElementById('uptime').textContent = `${hours}h ${minutes}m ${seconds}s`;
+            } else if (minutes > 0) {
+                document.getElementById('uptime').textContent = `${minutes}m ${seconds}s`;
+            } else {
+                document.getElementById('uptime').textContent = `${seconds}s`;
+            }
+        }
+
+        // Atualizar status
+        function updateStatus(online) {
+            const indicator = document.getElementById('statusIndicator');
+            indicator.className = online ? 'status-indicator status-online' : 'status-indicator status-offline';
+        }
+
+        // Mostrar erro
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `
+                <div class="error-message">
+                    <strong>⚠️ Erro de Conexão</strong><br>
+                    ${message}<br>
+                    <small>Execute: <code>python api.py</code></small>
+                </div>
+            `;
+        }
+
+        // Auto-refresh
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(fetchData, 5000);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+            }
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            fetchData();
+
+            document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
+            toggleAutoRefresh();
+            
+            setInterval(updateUptime, 1000);
+        });
+    </script>
+</body>
+</html>
